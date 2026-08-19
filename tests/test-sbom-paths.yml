@@ -1,0 +1,107 @@
+name: Test ORT SBOM output paths
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-populate ORT config directory to avoid network clone
+        run: |
+          mkdir -p "$HOME/.ort/config"
+          cd "$HOME/.ort/config"
+          git init -q
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          touch placeholder.txt
+          git add placeholder.txt
+          git commit -q -m "init"
+          git remote add origin https://github.com/oss-review-toolkit/ort-config.git
+
+      - id: action
+        uses: .
+        with:
+          run: 'labels'
+          sw-name: 'sbom-test'
+          sw-version: '0.1.0'
+
+      - name: Assert results-sbom-cyclonedx-xml-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-sbom-cyclonedx-xml-path }}
+        run: |
+          echo "actual results-sbom-cyclonedx-xml-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-sbom-cyclonedx-xml-path output is empty"
+            exit 1
+          fi
+          if echo "$ACTUAL" | grep -q "cyclonedx.xml"; then
+            echo "PASS: cyclonedx xml path contains expected filename"
+          else
+            echo "FAIL: cyclonedx xml path does not contain 'cyclonedx.xml'"
+            exit 1
+          fi
+
+      - name: Assert results-sbom-cyclonedx-json-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-sbom-cyclonedx-json-path }}
+        run: |
+          echo "actual results-sbom-cyclonedx-json-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-sbom-cyclonedx-json-path output is empty"
+            exit 1
+          fi
+          if echo "$ACTUAL" | grep -q "cyclonedx.json"; then
+            echo "PASS: cyclonedx json path contains expected filename"
+          else
+            echo "FAIL: cyclonedx json path does not contain 'cyclonedx.json'"
+            exit 1
+          fi
+
+      - name: Assert results-sbom-spdx-json-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-sbom-spdx-json-path }}
+        run: |
+          echo "actual results-sbom-spdx-json-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-sbom-spdx-json-path output is empty"
+            exit 1
+          fi
+          if echo "$ACTUAL" | grep -q "spdx.json"; then
+            echo "PASS: spdx json path contains expected filename"
+          else
+            echo "FAIL: spdx json path does not contain 'spdx.json'"
+            exit 1
+          fi
+
+      - name: Assert results-sbom-spdx-yml-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-sbom-spdx-yml-path }}
+        run: |
+          echo "actual results-sbom-spdx-yml-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-sbom-spdx-yml-path output is empty"
+            exit 1
+          fi
+          if echo "$ACTUAL" | grep -q "spdx.yml"; then
+            echo "PASS: spdx yml path contains expected filename"
+          else
+            echo "FAIL: spdx yml path does not contain 'spdx.yml'"
+            exit 1
+          fi
+
+      - name: Assert results-web-app-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-web-app-path }}
+        run: |
+          echo "actual results-web-app-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-web-app-path output is empty"
+            exit 1
+          fi
+          if echo "$ACTUAL" | grep -q "web-app"; then
+            echo "PASS: web-app path contains expected filename"
+          else
+            echo "FAIL: web-app path does not contain 'web-app'"
+            exit 1
+          fi

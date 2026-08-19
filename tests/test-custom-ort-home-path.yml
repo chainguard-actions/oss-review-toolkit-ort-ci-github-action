@@ -1,0 +1,64 @@
+name: Test ORT custom ort-home-path
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-populate custom ORT config directory to avoid network clone
+        run: |
+          mkdir -p "$HOME/.custom-ort-home/config"
+          cd "$HOME/.custom-ort-home/config"
+          git init -q
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          touch placeholder.txt
+          git add placeholder.txt
+          git commit -q -m "init"
+          git remote add origin https://github.com/oss-review-toolkit/ort-config.git
+
+      - id: action
+        uses: .
+        with:
+          run: 'labels'
+          sw-name: 'home-path-test'
+          sw-version: '1.0.0'
+          ort-home-path: '.custom-ort-home'
+
+      - name: Assert results-path uses custom ort-home-path
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-path }}
+        run: |
+          echo "actual results-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-path output is empty"
+            exit 1
+          fi
+          if echo "$ACTUAL" | grep -q ".custom-ort-home"; then
+            echo "PASS: results-path contains custom ort-home-path '.custom-ort-home'"
+          else
+            echo "FAIL: results-path does not contain custom ort-home-path '.custom-ort-home'"
+            echo "Got: $ACTUAL"
+            exit 1
+          fi
+
+      - name: Assert custom ort-home-path directories were created
+        run: |
+          CUSTOM_HOME="$HOME/.custom-ort-home"
+          echo "Checking custom home directory: $CUSTOM_HOME"
+          if [ ! -d "$CUSTOM_HOME" ]; then
+            echo "FAIL: custom ort-home-path directory was not created: $CUSTOM_HOME"
+            exit 1
+          fi
+          echo "PASS: custom ort-home-path directory exists"
+
+          # Check subdirectories were created
+          for subdir in cache config ort-results; do
+            if [ ! -d "$CUSTOM_HOME/$subdir" ]; then
+              echo "FAIL: subdirectory $subdir was not created under custom ort-home-path"
+              exit 1
+            fi
+            echo "PASS: subdirectory $subdir exists"
+          done

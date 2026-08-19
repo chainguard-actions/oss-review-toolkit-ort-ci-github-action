@@ -1,0 +1,61 @@
+name: Test ORT custom sw-name and sw-version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-populate ORT config directory to avoid network clone
+        run: |
+          mkdir -p "$HOME/.ort/config"
+          cd "$HOME/.ort/config"
+          git init -q
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          touch placeholder.txt
+          git add placeholder.txt
+          git commit -q -m "init"
+          git remote add origin https://github.com/oss-review-toolkit/ort-config.git
+
+      - id: action
+        uses: .
+        with:
+          run: 'labels'
+          sw-name: 'My Test Project'
+          sw-version: '2.3.4'
+
+      - name: Assert results-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-path }}
+        run: |
+          echo "actual results-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-path is set"
+
+      - name: Assert ORT_RESULTS_ARTIFACT_NAME contains sanitized sw-name
+        run: |
+          echo "ORT_RESULTS_ARTIFACT_NAME: $ORT_RESULTS_ARTIFACT_NAME"
+          # sw-name 'My Test Project' should be sanitized to 'my-test-project'
+          if echo "$ORT_RESULTS_ARTIFACT_NAME" | grep -q "my-test-project"; then
+            echo "PASS: artifact name contains sanitized sw-name"
+          else
+            echo "FAIL: artifact name does not contain expected sanitized sw-name 'my-test-project'"
+            echo "Got: $ORT_RESULTS_ARTIFACT_NAME"
+            exit 1
+          fi
+
+      - name: Assert ORT_RESULTS_ARTIFACT_NAME contains sw-version
+        run: |
+          echo "ORT_RESULTS_ARTIFACT_NAME: $ORT_RESULTS_ARTIFACT_NAME"
+          if echo "$ORT_RESULTS_ARTIFACT_NAME" | grep -q "2.3.4"; then
+            echo "PASS: artifact name contains sw-version"
+          else
+            echo "FAIL: artifact name does not contain expected sw-version '2.3.4'"
+            echo "Got: $ORT_RESULTS_ARTIFACT_NAME"
+            exit 1
+          fi

@@ -1,0 +1,82 @@
+name: Test ORT basic initialization
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-populate ORT config directory to avoid network clone
+        run: |
+          mkdir -p "$HOME/.ort/config"
+          cd "$HOME/.ort/config"
+          git init -q
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          touch placeholder.txt
+          git add placeholder.txt
+          git commit -q -m "init"
+          git remote add origin https://github.com/oss-review-toolkit/ort-config.git
+
+      - id: action
+        uses: .
+        with:
+          run: 'labels'
+          sw-name: 'test-project'
+          sw-version: '1.0.0'
+
+      - name: Assert results-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-path }}
+        run: |
+          echo "actual results-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-path is set to $ACTUAL"
+
+      - name: Assert results-path directory exists
+        env:
+          RESULTS_PATH: ${{ steps.action.outputs.results-path }}
+        run: |
+          echo "Checking directory: $RESULTS_PATH"
+          if [ ! -d "$RESULTS_PATH" ]; then
+            echo "FAIL: results-path directory does not exist: $RESULTS_PATH"
+            exit 1
+          fi
+          echo "PASS: results-path directory exists"
+
+      - name: Assert results-advisor-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-advisor-path }}
+        run: |
+          echo "actual results-advisor-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-advisor-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-advisor-path is set to $ACTUAL"
+
+      - name: Assert results-evaluator-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-evaluator-path }}
+        run: |
+          echo "actual results-evaluator-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-evaluator-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-evaluator-path is set to $ACTUAL"
+
+      - name: Assert results-scanner-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-scanner-path }}
+        run: |
+          echo "actual results-scanner-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-scanner-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-scanner-path is set to $ACTUAL"
