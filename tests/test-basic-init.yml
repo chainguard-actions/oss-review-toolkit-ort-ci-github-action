@@ -1,0 +1,110 @@
+---
+# Test: Basic initialization of ORT action - verifies workspace init and output paths are set
+name: Test ORT basic init
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          # Use the workspace as the ORT config path - it's already a git repo with a remote,
+          # so the ort-config step will skip cloning (non-empty dir) and
+          # ort-config-url-and-revision will succeed (valid git repo).
+          ort-config-path: '${{ github.workspace }}'
+          # Only run steps that don't require Docker
+          run: 'none'
+          sw-name: 'test-project'
+          sw-version: '1.0.0'
+
+      - name: Assert results-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-path }}
+        run: |
+          echo "results-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-path is set to '$ACTUAL'"
+
+      - name: Assert results-advisor-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-advisor-path }}
+        run: |
+          echo "results-advisor-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-advisor-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-advisor-path is set to '$ACTUAL'"
+
+      - name: Assert results-evaluator-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-evaluator-path }}
+        run: |
+          echo "results-evaluator-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-evaluator-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-evaluator-path is set to '$ACTUAL'"
+
+      - name: Assert results-scanner-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-scanner-path }}
+        run: |
+          echo "results-scanner-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-scanner-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-scanner-path is set to '$ACTUAL'"
+
+      - name: Assert results-sbom-cyclonedx-xml-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-sbom-cyclonedx-xml-path }}
+        run: |
+          echo "results-sbom-cyclonedx-xml-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-sbom-cyclonedx-xml-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-sbom-cyclonedx-xml-path is set to '$ACTUAL'"
+
+      - name: Assert results-sbom-spdx-json-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-sbom-spdx-json-path }}
+        run: |
+          echo "results-sbom-spdx-json-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-sbom-spdx-json-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-sbom-spdx-json-path is set to '$ACTUAL'"
+
+      - name: Assert results-web-app-path output is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-web-app-path }}
+        run: |
+          echo "results-web-app-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-web-app-path output is empty"
+            exit 1
+          fi
+          echo "PASS: results-web-app-path is set to '$ACTUAL'"
+
+      - name: Assert ORT results directory was created
+        env:
+          RESULTS_PATH: ${{ steps.action.outputs.results-path }}
+        run: |
+          echo "Checking if results directory exists at: $RESULTS_PATH"
+          if [ ! -d "$RESULTS_PATH" ]; then
+            echo "FAIL: results directory does not exist at '$RESULTS_PATH'"
+            exit 1
+          fi
+          echo "PASS: results directory exists"

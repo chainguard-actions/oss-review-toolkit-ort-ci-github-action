@@ -1,0 +1,66 @@
+---
+# Test: Custom sw-name and sw-version inputs are properly handled
+name: Test ORT custom sw-name and sw-version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          # Use the workspace as the ORT config path - it's already a git repo with a remote,
+          # so the ort-config step will skip cloning (non-empty dir) and
+          # ort-config-url-and-revision will succeed (valid git repo).
+          ort-config-path: '${{ github.workspace }}'
+          # Only run steps that don't require Docker
+          run: 'none'
+          sw-name: 'My Test Project'
+          sw-version: '2.3.4'
+
+      - name: Assert results-path output contains expected ort-results directory
+        env:
+          ACTUAL: ${{ steps.action.outputs.results-path }}
+        run: |
+          echo "results-path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: results-path output is empty"
+            exit 1
+          fi
+          # Should contain ort-results in the path
+          if echo "$ACTUAL" | grep -q "ort-results"; then
+            echo "PASS: results-path contains 'ort-results'"
+          else
+            echo "FAIL: results-path '$ACTUAL' does not contain 'ort-results'"
+            exit 1
+          fi
+
+      - name: Assert ORT_HOME_PATH directory structure was created
+        run: |
+          ORT_HOME="$HOME/.ort"
+          echo "Checking ORT home directory structure at: $ORT_HOME"
+          for subdir in cache config ort-results; do
+            if [ ! -d "$ORT_HOME/$subdir" ]; then
+              echo "FAIL: expected directory '$ORT_HOME/$subdir' does not exist"
+              exit 1
+            fi
+            echo "  OK: $ORT_HOME/$subdir exists"
+          done
+          echo "PASS: all expected ORT home subdirectories exist"
+
+      - name: Assert SW_NAME_SAFE env var is set and sanitized
+        run: |
+          echo "SW_NAME_SAFE: $SW_NAME_SAFE"
+          if [ -z "$SW_NAME_SAFE" ]; then
+            echo "FAIL: SW_NAME_SAFE env var is not set"
+            exit 1
+          fi
+          # Should not contain spaces (spaces replaced with dashes)
+          if echo "$SW_NAME_SAFE" | grep -q " "; then
+            echo "FAIL: SW_NAME_SAFE contains spaces: '$SW_NAME_SAFE'"
+            exit 1
+          fi
+          echo "PASS: SW_NAME_SAFE is set and sanitized: '$SW_NAME_SAFE'"
