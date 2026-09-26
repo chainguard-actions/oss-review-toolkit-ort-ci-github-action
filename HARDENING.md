@@ -10,69 +10,78 @@
 
 **Harden Agent Version:** `2`
 
-Action **oss-review-toolkit--ort-ci-github-action/v1.2.0** was hardened automatically. 3 finding(s) were identified and resolved across 2 iteration(s).
+Action **oss-review-toolkit--ort-ci-github-action/v1.2.0** was hardened automatically. 2 finding(s) were identified and resolved across 4 iteration(s).
 
 ## Findings Fixed
 
 ### github-env-injection (severity: high)
 
-Four `run:` steps call `printenv >> "$GITHUB_ENV"` which dumps the entire process environment — including all inputs-derived env vars (SW_NAME, SW_VERSION, ORT_CLI_ARGS, POSTGRES_PASSWORD, HTTP_FILE_SERVER_TOKEN, ORT_DOCKER_IMAGE, ORT_DOCKER_CLI_ARGS, etc.) — into $GITHUB_ENV without any sanitization (no `printf '%s' | tr -d '\n\r'`). An attacker-controlled input containing newlines can inject arbitrary environment variable definitions into GITHUB_ENV, enabling environment variable hijacking for subsequent steps. This affects: (1) 'Init Workspace' step — exports all inputs-derived vars then calls `printenv >> "$GITHUB_ENV"`; (2) 'Capture ORT config URL and revision' step — calls `printenv >> "$GITHUB_ENV"` after setting ORT_CONFIG_VCS_URL/REVISION from git; (3) 'Compute ORT labels' step — calls `printenv >> "$GITHUB_ENV"` after building ORT_CLI_ANALYZE_ARGS from inputs; (4) 'Run ORT Analyzer' step — calls `printenv >> "$GITHUB_ENV"` inline in the docker run chain.
+Four `run:` blocks call `printenv >> "$GITHUB_ENV"` which dumps the entire process environment — including all `inputs.*`-derived env vars (e.g. ORT_CLI_ARGS, ORT_DOCKER_IMAGE, SW_NAME, SW_VERSION, HTTP_FILE_SERVER_PASSWORD, POSTGRES_PASSWORD, etc.) — into $GITHUB_ENV without any newline sanitization (`tr -d '\n\r'`). A calling workflow can supply an input value containing embedded newlines to inject arbitrary key=value pairs into the runner environment for subsequent steps. This matches check pattern (e): inherited env vars forwarded to GITHUB_ENV without sanitization. Affected steps: 'Init Workspace' (ort-init), 'Capture ORT config URL and revision' (ort-config-url-and-revision), 'Compute ORT labels' (ort-labels), and 'Run ORT Analyzer' (ort-analyzer).
 
 Locations:
 
-- `action.yml:360`
-- `action.yml:390`
-- `action.yml:440`
-- `action.yml:540`
+- `action.yml:271`
+- `action.yml:291`
+- `action.yml:320`
+- `action.yml:374`
 
 ### script-injection (severity: high)
 
-Multiple `run:` blocks expand env vars that hold untrusted `inputs.*` values without double-quoting, violating sub-rule (b). In the 'Download project sources' step, `$ORT_DOCKER_CLI_ARGS`, `$ORT_DOCKER_IMAGE`, `--$ORT_LOG_LEVEL`, `$ORT_CLI_ARGS`, and `${ORT_CLI_DOWNLOAD_ARGS}` are all unquoted in the `docker run` command — these are set from `inputs.docker-cli-args`, `inputs.image`, `inputs.log-level`, `inputs.ort-cli-args`, and `inputs.vcs-*` respectively. The same pattern repeats in 'Run ORT Analyzer' (`$ORT_DOCKER_CLI_ARGS`, `$ORT_DOCKER_IMAGE`, `--$ORT_LOG_LEVEL`, `$ORT_CLI_ARGS`, `${ORT_CLI_ANALYZE_ARGS}`), 'Run ORT Scanner' (same plus `${ORT_CLI_SCAN_ARGS}`), 'Run ORT Advisor' (`$ORT_ADVISORS`, `${ORT_CLI_ADVISE_ARGS}`), 'Run ORT Evaluator' (`${ORT_CLI_EVALUATE_ARGS}`), and 'Run ORT Reporter' (`$ORT_REPORT_FORMATS`, `$SW_NAME`, `${ORT_CLI_REPORT_ARGS}`). Unquoted expansion allows shell metacharacters (`;`, `|`, `&`, `$(...)`, whitespace, globs) in any of these inputs to break out of the intended command and execute arbitrary shell commands.
+Multiple `run:` blocks expand env vars that hold `inputs.*`-derived values without double-quoting, violating rule (b). Examples across steps: `$ORT_DOCKER_CLI_ARGS` (from inputs.docker-cli-args), `$ORT_DOCKER_IMAGE` (from inputs.image), `--$ORT_LOG_LEVEL` (from inputs.log-level), `$ORT_CLI_ARGS` (from inputs.ort-cli-args), `${ORT_CLI_DOWNLOAD_ARGS}` (built from inputs.vcs-*), `$ORT_ADVISORS` (from inputs.advisors), `$ORT_REPORT_FORMATS` (from inputs.report-formats) are all passed unquoted to `docker run` commands. An attacker-controlled input value containing shell metacharacters (`;`, `|`, `&`, `$(...)`, etc.) can break out of the intended argument and execute arbitrary commands. Affected steps: 'Download project sources' (project-sources), 'Run ORT Analyzer' (ort-analyzer), 'Run ORT Scanner' (ort-scanner), 'Run ORT Advisor' (ort-advisor), 'Run ORT Evaluator' (ort-evaluator), 'Run ORT Reporter' (ort-reporter).
 
 Locations:
 
-- `action.yml:475`
-- `action.yml:515`
-- `action.yml:548`
-- `action.yml:585`
-- `action.yml:617`
-- `action.yml:646`
-
-### missing-permissions (severity: medium)
-
-The workflow file 'renovate-validation.yml' has no top-level `permissions:` key and the single job `renovate-validation` also has no job-level `permissions:` key. Without explicit permissions, the workflow inherits the repository's default token permissions (which may be `write-all` for some repositories), granting the GITHUB_TOKEN broader access than necessary. A minimal permissions block (e.g., `contents: read`) should be added.
-
-Locations:
-
-- `.github/workflows/renovate-validation.yml:1`
+- `action.yml:349`
+- `action.yml:365`
+- `action.yml:385`
+- `action.yml:406`
+- `action.yml:427`
+- `action.yml:449`
 
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** github-env-injection, script-injection, missing-permissions
+**Fixes applied:** github-env-injection, script-injection
 
 **Notes:**
 
-Fixed all three findings in action.yml and .github/workflows/renovate-validation.yml:
-
-1. github-env-injection: Replaced all four `printenv >> "$GITHUB_ENV"` calls with explicit, sanitized writes. Each variable is now written individually using `printf '%s' "$VAR" | tr -d '\n\r'` to strip newlines before writing to GITHUB_ENV, preventing environment variable injection attacks.
-
-2. script-injection: Fixed all six docker run command blocks (Download, Analyzer, Scanner, Advisor, Evaluator, Reporter) by: (a) using `read -ra _array <<< "$VAR"` to split multi-word args into bash arrays and expanding them as `"${_array[@]}"`, (b) quoting single-value variables like `"$ORT_DOCKER_IMAGE"`, `"$ORT_ADVISORS"`, `"$ORT_REPORT_FORMATS"`, and (c) changing `--$ORT_LOG_LEVEL` to `"--${ORT_LOG_LEVEL}"` to prevent shell metacharacter injection.
-
-3. missing-permissions: Added `permissions: contents: read` top-level block to renovate-validation.yml to restrict the GITHUB_TOKEN to the minimum required permissions.
+Fixed all four `printenv >> "$GITHUB_ENV"` calls by replacing them with explicit per-variable writes using `printf '%s' "${!_var}" | tr -d '\n\r'` to sanitize newlines before writing to GITHUB_ENV. Fixed all unquoted argument list variables in docker run commands across six steps (project-sources, ort-analyzer, ort-scanner, ort-advisor, ort-evaluator, ort-reporter) by tokenizing ORT_DOCKER_CLI_ARGS, ORT_CLI_ARGS, and per-command CLI args (ORT_CLI_DOWNLOAD_ARGS, ORT_CLI_ANALYZE_ARGS, ORT_CLI_SCAN_ARGS, ORT_CLI_ADVISE_ARGS, ORT_CLI_EVALUATE_ARGS, ORT_CLI_REPORT_ARGS) into bash arrays using the xargs/read-loop pattern. Single-value arguments ORT_DOCKER_IMAGE, ORT_LOG_LEVEL, ORT_ADVISORS, and ORT_REPORT_FORMATS are now properly double-quoted.
 
 ### Iteration 2
+
+**Fixes applied:** script-injection
+
+**Notes:**
+
+Fixed three script-injection findings in hardened/action/action.yml:
+1. ort-config step (lines 349-350): Added double quotes around `$ORT_CONFIG_VCS_URL` and `$ORT_CONFIG_VCS_REVISION` in `git remote add` and `git fetch` commands.
+2. project-sources step (lines 444-447): Replaced the unsafe string-building pattern (embedding unquoted variables into ORT_CLI_DOWNLOAD_ARGS string) with direct array construction. The `ort_cli_download_args` array is now populated directly with properly double-quoted individual values (`"$PROJECT_VCS_TYPE"`, `"$PROJECT_VCS_URL"`, `"$PROJECT_VCS_REVISION"`, `"$PROJECT_VCS_PATH"`) prepended to any existing args from the xargs-tokenized ORT_CLI_DOWNLOAD_ARGS env var.
+3. ort-analyzer step (line 487): Added double quotes around the `-P` flag value: `-P "ort.analyzer.allowDynamicVersions=${ORT_ALLOW_DYNAMIC_VERSIONS}"` to prevent shell metacharacter injection.
+
+### Iteration 3
+
+**Fixes applied:** script-injection
+
+**Notes:**
+
+Fixed all 6 categories of unquoted variable expansions in action.yml:
+1. Init Workspace: `mkdir -p $HOME/$ORT_HOME_PATH/{...}` → expanded brace expansion into individual quoted `mkdir -p "$HOME/$ORT_HOME_PATH/cache" ...` calls and quoted `chmod` path.
+2. Init Workspace: `cd $PROJECT_PATH` (×2) → `cd "$PROJECT_PATH"` in both SW_NAME and SW_VERSION command substitutions.
+3. Init Workspace: `echo $SW_NAME | sed` → `echo "$SW_NAME" | sed`.
+4. ort-config step: `cd $ORT_CONFIG_PATH` → `cd "$ORT_CONFIG_PATH"`.
+5. ort-config-url-and-revision step: `cd $ORT_CONFIG_PATH` → `cd "$ORT_CONFIG_PATH"`.
+6. All docker run steps (project-sources, ort-analyzer, ort-scanner, ort-advisor, ort-evaluator, ort-reporter): `-o ${PROJECT_PATH/$USER/ort}`, `-i ${ORT_RESULTS_CURRENT_PATH/$USER/ort}`, `-o ${ORT_RESULTS_PATH/$USER/ort}` → all wrapped in double quotes.
+
+### Iteration 4
 
 **Fixes applied:** github-env-injection, script-injection
 
 **Notes:**
 
-Fixed three security findings in hardened/action/action.yml:
+Fixed two security findings in hardened/action/action.yml:
 
-1. github-env-injection: Replaced all 11 bare `echo "key=${VAR}" >> "$GITHUB_OUTPUT"` writes in the Init Workspace step with `printf 'key=%s\n' "$(printf '%s' "$VAR" | tr -d '\n\r')" >> "$GITHUB_OUTPUT"` to strip newlines and prevent injection of arbitrary output variables via a crafted inputs.ort-home-path value.
+1. github-env-injection: Replaced all 11 bare `echo "key=${VAR}" >> "$GITHUB_OUTPUT"` statements in the 'Init Workspace' step with sanitized `printf 'key=%s\n' "$(printf '%s' "${VAR}" | tr -d '\n\r')" >> "$GITHUB_OUTPUT"` forms. This prevents newline injection into GITHUB_OUTPUT from user-controlled `inputs.ort-home-path`.
 
-2. script-injection (ort-config step, line ~345): Added double-quotes around `$ORT_CONFIG_VCS_URL` and `$ORT_CONFIG_VCS_REVISION` in the `git remote add origin` and `git fetch` commands to prevent shell metacharacter injection.
-
-3. script-injection (download step, line ~435): Replaced string-concatenation-based ORT_CLI_DOWNLOAD_ARGS building (which left values unquoted) with a bash array `_ort_cli_download_args` where each value is properly double-quoted (e.g., `_ort_cli_download_args+=(--vcs-type "$PROJECT_VCS_TYPE")`), preventing command injection via attacker-controlled vcs-type, vcs-url, vcs-revision, and vcs-path inputs.
+2. script-injection: Fixed the unquoted `--repository-configuration-file ${ORT_YML_PATH}` in the 'Compute ORT labels' step by adding escaped double-quotes around `${ORT_YML_PATH}` in all three CLI args assignments (ORT_CLI_ANALYZE_ARGS, ORT_CLI_EVALUATE_ARGS, ORT_CLI_REPORT_ARGS), preventing word-splitting on user-controlled path values.
 
