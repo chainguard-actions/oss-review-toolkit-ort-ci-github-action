@@ -6,10 +6,10 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 ## Versions
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v1.1.0 | [`v1.1.0`](https://github.com/chainguard-actions/oss-review-toolkit-ort-ci-github-action/tree/v1.1.0) | [`1805edc`](https://github.com/oss-review-toolkit/ort-ci-github-action/commit/1805edcf1f4f55f35ae6e4d2d9795ccfb29b6021) |
-| v1.2.0 | [`v1.2.0`](https://github.com/chainguard-actions/oss-review-toolkit-ort-ci-github-action/tree/v1.2.0) | [`086d928`](https://github.com/oss-review-toolkit/ort-ci-github-action/commit/086d928d24ef1653dc0777296b312fda5faaaf52) |
+| Version | Tag | Upstream commit | Hardening report |
+|---------|-----|-----------------|------------------|
+| v1.1.0 | [`v1.1.0`](https://github.com/chainguard-actions/oss-review-toolkit-ort-ci-github-action/tree/v1.1.0) | [`1805edc`](https://github.com/oss-review-toolkit/ort-ci-github-action/commit/1805edcf1f4f55f35ae6e4d2d9795ccfb29b6021) | [`HARDENING.md`](https://github.com/chainguard-actions/oss-review-toolkit-ort-ci-github-action/blob/v1.1.0/HARDENING.md) |
+| v1.2.0 | [`v1.2.0`](https://github.com/chainguard-actions/oss-review-toolkit-ort-ci-github-action/tree/v1.2.0) | [`086d928`](https://github.com/oss-review-toolkit/ort-ci-github-action/commit/086d928d24ef1653dc0777296b312fda5faaaf52) | [`HARDENING.md`](https://github.com/chainguard-actions/oss-review-toolkit-ort-ci-github-action/blob/v1.2.0/HARDENING.md) |
 
 ## Privacy
 
